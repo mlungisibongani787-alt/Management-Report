@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pick Pool Summary</title>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <style>
 :root{
   --nebula-green:#07834f;--nebula-green-2:#e8f5ee;--nebula-purple:#5a2a83;--nebula-purple-2:#efe8f7;
@@ -255,8 +255,132 @@ function editCell(td){if(td.querySelector('input'))return;const r=+td.dataset.ro
 function addRow(){if(!state.headers.length){showToast('Upload a report first');return}state.rows.push(state.headers.map(()=>''));refreshAll();if(document.getElementById('rawTab').style.display!=='none')renderRaw();showToast('New row added')}
 function addColumn(){if(!state.headers.length){showToast('Upload a report first');return}const name=prompt('New column name:','New Column');if(!name)return;if(state.headers.some(h=>norm(h)===norm(name))){alert('That column already exists.');return}state.headers.push(name);state.rows.forEach(r=>r.push(''));refreshAll();if(document.getElementById('rawTab').style.display!=='none')renderRaw();showToast('New column added')}
 function resetAll(){state.selectedDates.clear();state.dateViewMode='days';state.type='';state.company='';state.status='';state.search='';state.multiFilters={};state.filterMenuQuery='';document.getElementById('searchFilter').value='';document.getElementById('datePreset').value='all';refreshAll();showToast('All filters reset')}
-function workbookFromState(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.aoa_to_sheet([state.headers,...state.rows]);XLSX.utils.book_append_sheet(wb,ws,'Pick_Pool_Summary');const summary=[['Pick Pool Summary'],['Source',state.sourceName],['Date Field',state.dateField],['Total Qty',sumMetric(state.rows,'Qty')],['Total Picked',sumMetric(state.rows,'Picked')],['WIP',sumMetric(state.rows,'WIP')]];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(summary),'SUMMARY');return wb}
-function exportExcel(){if(!state.headers.length){showToast('Nothing to export');return}XLSX.writeFile(workbookFromState(),'Pick_Pool_Draft.xlsx');showToast('Excel downloaded')}
+function activeFilterSummary(){
+ const out=[];
+ if(state.dateViewMode==='months') out.push(['Date View','All Months']);
+ else if(state.selectedDates.size) out.push(['Date View',[...state.selectedDates].sort().map(dateLabel).join(', ')]);
+ else out.push(['Date View','All Days']);
+ state.visibleFilters.forEach(h=>{
+   const key=state.headers.find(x=>norm(x)===norm(h))||h;
+   const set=state.multiFilters[key];
+   if(set&&set.size) out.push([h,[...set].sort().join(', ')]);
+ });
+ if(state.search) out.push(['Search',state.search]);
+ out.push(['Closed statuses included',state.includeClosed?'Yes':'No']);
+ return out;
+}
+const XLS_STYLES={
+  // Keep exported Excel cells readable even in Excel installations that do not
+  // preserve white font colours reliably. Dark text is used on every dark
+  // section that previously rendered as black-on-black.
+  title:{font:{bold:true,color:'111111',sz:16},fill:{fgColor:{rgb:'07834F'}},alignment:{vertical:'center'}},
+  label:{font:{bold:true,color:'111111'},fill:{fgColor:{rgb:'E8E8E8'}},alignment:{vertical:'center'}},
+  value:{font:{color:'111111'},fill:{fgColor:{rgb:'FFFFFF'}},alignment:{vertical:'center'}},
+  greenHead:{font:{bold:true,color:'111111'},fill:{fgColor:{rgb:'07834F'}},alignment:{horizontal:'center',vertical:'center'}},
+  purpleHead:{font:{bold:true,color:'111111'},fill:{fgColor:{rgb:'D9C2E9'}},alignment:{horizontal:'center',vertical:'center'}},
+  yellowHead:{font:{bold:true,color:'111111'},fill:{fgColor:{rgb:'F6B916'}},alignment:{horizontal:'center',vertical:'center'}},
+  blackHead:{font:{bold:true,color:'111111'},fill:{fgColor:{rgb:'E8E8E8'}},alignment:{vertical:'center'}},
+  blue:{fill:{fgColor:{rgb:'D9EDF7'}},font:{bold:true,color:'111111'}},
+  blueSoft:{fill:{fgColor:{rgb:'EDF7FB'}},font:{color:'111111'}},
+  grey:{fill:{fgColor:{rgb:'DDDDDD'}},font:{color:'111111'}},
+  month:{fill:{fgColor:{rgb:'DCEEE7'}},font:{bold:true,color:'111111'},alignment:{horizontal:'center',vertical:'center'}},
+  day:{fill:{fgColor:{rgb:'EAF6EF'}},font:{bold:true,color:'111111'},alignment:{horizontal:'center',vertical:'center'}},
+  monthTotal:{fill:{fgColor:{rgb:'DDDDDD'}},font:{bold:true,color:'111111'},alignment:{horizontal:'center',vertical:'center'}},
+  grand:{fill:{fgColor:{rgb:'D9EDF7'}},font:{bold:true,color:'111111'},alignment:{horizontal:'center',vertical:'center'}},
+  overdue:{fill:{fgColor:{rgb:'E57373'}},font:{bold:true,color:'111111'}},
+  border:{top:{style:'thin',color:{rgb:'999999'}},bottom:{style:'thin',color:{rgb:'999999'}},left:{style:'thin',color:{rgb:'999999'}},right:{style:'thin',color:{rgb:'999999'}}},
+  section:{font:{bold:true,color:'111111'},fill:{fgColor:{rgb:'D9C2E9'}},alignment:{vertical:'center'}}
+};
+function mergeStyle(base,extra){return Object.assign({},base,extra||{});}
+function styleCell(cell,style){cell.s=mergeStyle(style, {border:XLS_STYLES.border});}
+function styleDomTable(ws,table,originRow){
+  const trs=[...table.querySelectorAll('tr')];
+  trs.forEach((tr,ri)=>{
+    const cells=[...tr.children];
+    cells.forEach((el,ci)=>{
+      const cell=ws[XLSX.utils.encode_cell({r:originRow+ri,c:ci})];
+      if(!cell)return;
+      let st=XLS_STYLES.value;
+      if(el.tagName==='TH'){
+        if(el.classList.contains('greenhead'))st=XLS_STYLES.greenHead;
+        else if(el.classList.contains('purplehead'))st=XLS_STYLES.purpleHead;
+        else if(el.classList.contains('blackhead'))st=XLS_STYLES.blackHead;
+        else if(el.classList.contains('month'))st=XLS_STYLES.month;
+        else if(el.classList.contains('day'))st=XLS_STYLES.day;
+        else if(el.classList.contains('monthtotal'))st=XLS_STYLES.monthTotal;
+        else if(el.classList.contains('grand'))st=XLS_STYLES.grand;
+        else st=XLS_STYLES.blueSoft;
+      } else if(el.classList.contains('overdue-cell')) st=XLS_STYLES.overdue;
+      else if(el.classList.contains('blackhead')) st=XLS_STYLES.blackHead;
+      else if(el.classList.contains('group')) st=XLS_STYLES.blueSoft;
+      else if(el.classList.contains('total')) st=XLS_STYLES.blue;
+      else if(el.classList.contains('grey')) st=XLS_STYLES.grey;
+      else if(el.classList.contains('month')) st=XLS_STYLES.month;
+      else if(el.classList.contains('day')) st=XLS_STYLES.day;
+      else if(el.classList.contains('monthtotal')) st=XLS_STYLES.monthTotal;
+      else if(el.classList.contains('grand')) st=XLS_STYLES.grand;
+      if(el.classList.contains('num')) st=mergeStyle(st,{alignment:{horizontal:'right',vertical:'center'}});
+      styleCell(cell,st);
+    });
+  });
+}
+function appendDomTable(ws,table,originRow,sectionTitle){
+ if(!table)return originRow;
+ if(sectionTitle){XLSX.utils.sheet_add_aoa(ws,[[sectionTitle]],{origin:{r:originRow,c:0}});const sec=ws[XLSX.utils.encode_cell({r:originRow,c:0})];styleCell(sec,XLS_STYLES.section);originRow+=2;}
+ const temp=XLSX.utils.table_to_sheet(table,{raw:true});
+ const data=XLSX.utils.sheet_to_json(temp,{header:1,defval:''});
+ if(data.length){XLSX.utils.sheet_add_aoa(ws,data,{origin:{r:originRow,c:0}});styleDomTable(ws,table,originRow);}
+ return originRow+data.length+2;
+}
+function styleMetaSheet(ws){
+  const range=ws['!ref']?XLSX.utils.decode_range(ws['!ref']):{s:{r:0,c:0},e:{r:0,c:0}};
+  for(let r=0;r<=range.e.r;r++){
+    for(let c=0;c<=range.e.c;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(!cell)continue;
+      if(r===0) styleCell(cell,XLS_STYLES.title);
+      else if(c===0) styleCell(cell,XLS_STYLES.label);
+      else styleCell(cell,XLS_STYLES.value);
+    }
+  }
+  ws['A1'].s=mergeStyle(XLS_STYLES.title,{border:XLS_STYLES.border});
+  ws['A1'].v='PICK POOL SUMMARY';
+}
+function workbookFromState(){
+ const wb=XLSX.utils.book_new();
+ const ws=XLSX.utils.aoa_to_sheet([
+   ['PICK POOL SUMMARY'],
+   ['Source',state.sourceName||''],
+   ['Date field',state.dateField||''],
+   ...activeFilterSummary(),
+   ['Total Qty',sumMetric(filteredRows(),'Qty'),'Total Picked',sumMetric(filteredRows(),'Picked'),'WIP',sumMetric(filteredRows(),'WIP')]
+ ]);
+ styleMetaSheet(ws);
+ ws['!cols']=[{wch:30},{wch:22},{wch:18},{wch:18},{wch:18},{wch:18},{wch:18},{wch:18}];
+ let r=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).e.r+3:0;
+ r=appendDomTable(ws,document.querySelector('#topPivot table'),r,'SUMMARY — QTY / PICKED / WIP');
+ r=appendDomTable(ws,document.querySelector('#goalTable table'),r,'GOAL');
+ r=appendDomTable(ws,document.querySelector('#qtyPivot table'),r,'TOTAL QTY');
+ r=appendDomTable(ws,document.querySelector('#wipPivot table'),r,'WIP QTY');
+ const maxCol=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).e.c:7;
+ ws['!cols']=Array.from({length:Math.max(8,maxCol+1)},(_,i)=>({wch:i===0?30:16}));
+ ws['!freeze']={xSplit:1,ySplit:1};
+ XLSX.utils.book_append_sheet(wb,ws,'Summary');
+ const raw=XLSX.utils.aoa_to_sheet([state.headers,...state.rows]);
+ state.headers.forEach((_,c)=>{const cell=raw[XLSX.utils.encode_cell({r:0,c})];if(cell)styleCell(cell,XLS_STYLES.greenHead);});
+ for(let r0=1;r0<=state.rows.length;r0++)for(let c=0;c<state.headers.length;c++){
+   const cell=raw[XLSX.utils.encode_cell({r:r0,c})];if(cell)styleCell(cell,{fill:{fgColor:{rgb:r0%2?'FFFFFF':'F7F8F9'}},alignment:{vertical:'center'}});
+ }
+ raw['!cols']=state.headers.map(h=>({wch:Math.min(32,Math.max(12,String(h).length+2))}));
+ raw['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:state.rows.length,c:Math.max(0,state.headers.length-1)}})};
+ raw['!freeze']={xSplit:0,ySplit:1};
+ XLSX.utils.book_append_sheet(wb,raw,'Pick Pool Raw Data');
+ return wb;
+}
+function exportExcel(){
+ if(!state.headers.length){showToast('Nothing to export');return}
+ try{const wb=workbookFromState();XLSX.writeFile(wb,'Pick_Pool_Summary.xlsx');showToast('Excel Summary + Raw Data downloaded')}catch(e){console.error(e);showToast('Excel export failed');alert('Excel export failed. Please try again.');}
+}
 function extractGoals(wb){const s=wb.SheetNames.find(s=>norm(s)==='SUMMARY');if(!s)return;const a=XLSX.utils.sheet_to_json(wb.Sheets[s],{header:1,defval:'',raw:false});const out=[];for(const r of a){const label=String(r?.[8]??'').trim();if(!label)continue;const nums=[num(r[9]),num(r[10]),num(r[11])];if(nums.some(Boolean)||/^(Futures|At Once units|Close Out units|AA|NVS|Marketing|Brand|Total)$/i.test(label))out.push([label,...nums])}if(out.length)state.goals=out;for(const r of a){const label=String(r?.[8]??'').trim();if(/^(VAS|Returns)$/i.test(label))state.goalExtras[label]=[num(r[9]),num(r[10]),num(r[11])]}}
 async function loadWorkbook(file){try{const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true,raw:true});extractGoals(wb);let s=wb.SheetNames.find(s=>norm(s).replace(/\s/g,'')==='PICK_POOL_SUMMARY')||wb.SheetNames.find(s=>/pick.*pool/i.test(s))||wb.SheetNames.find(s=>{const a=XLSX.utils.sheet_to_json(wb.Sheets[s],{header:1,defval:'',raw:false});return a[0]?.some(v=>/EXTORDERKEY|PURC_ORDER|MATERIAL/i.test(String(v)))})||wb.SheetNames[0];const data=XLSX.utils.sheet_to_json(wb.Sheets[s],{header:1,defval:'',raw:true});if(!data.length)throw new Error('No readable rows');state.headers=data[0].map(v=>String(v??'').trim());state.rows=data.slice(1).filter(r=>r.some(v=>String(v??'').trim()!=='')).map(r=>state.headers.map((_,i)=>r[i]??''));state.sourceName=file.name;state.dateField=chooseDateField();state.selectedDates.clear();state.dateViewMode='days';state.type='';state.company='';state.status='';state.multiFilters={};state.rawSearch='';state.search='';refreshAll();showToast(`Loaded ${fmt(state.rows.length)} rows • ${state.headers.length} columns`)}catch(e){console.error(e);alert('Could not read the Pick Pool Excel report. Please check that it contains a header row and data sheet.')}}
 async function loadDemo(){try{const bytes=Uint8Array.from(atob(DEMO_B64),c=>c.charCodeAt(0));const ds=new DecompressionStream('gzip');const txt=await new Response(new Blob([bytes]).stream().pipeThrough(ds)).text();const p=JSON.parse(txt);state.headers=p.headers;state.rows=p.rows;state.sourceName='Built-in sample Pick Pool report';state.dateField=chooseDateField();state.multiFilters={};state.goals=[['Futures',104469,106068,16217],['At Once units',10348,1970,4870],['Close Out units',0,0,0],['AA',23860,61680,83590],['NVS',26110,27853,11422],['Marketing',5000,600,450],['Brand',100,120,0]];refreshAll()}catch(e){state.headers=[];state.rows=[];refreshAll()}}
