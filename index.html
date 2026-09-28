@@ -46,7 +46,7 @@ button{cursor:pointer}
       <button class="btn" id="exportBtn">Download Excel</button><button class="btn" id="printBtn">Print</button><button class="btn danger" id="clearBtn">New Report</button>
     </div>
   </div>
-  <div class="nav"><button class="tab active" data-tab="summary">Summary</button><button class="tab" data-tab="raw">Pick Pool Raw Data</button></div>
+  <div class="nav"><button class="tab active" data-tab="summary">Summary</button><button class="tab" data-tab="raw">Pick Pool Raw Data</button><button class="tab" data-tab="daily">Daily Management Update</button></div>
 </header>
 <main class="page">
 <section id="summaryTab">
@@ -73,6 +73,12 @@ button{cursor:pointer}
   </div>
 </section>
 <section id="rawTab" style="display:none">
+  <div class="raw-header"><div><h2>Pick Pool Raw Data</h2><div class="raw-info" id="rawInfo"></div></div><div class="actions"><button class="btn yellow" id="addRowBtn">+ Add Row</button><button class="btn yellow" id="addColBtn">+ Add Column</button></div></div>
+  <div class="raw-filter"><label>RAW SEARCH</label><input id="rawSearch" placeholder="Search all columns..."><label><input id="closedToggle" type="checkbox" style="vertical-align:middle"> Include completed/closed rows in operational tables</label><span class="badge">Double-click any value to edit</span></div>
+  <div class="raw-table-wrap" id="rawTableWrap"></div>
+</section>
+
+<section id="dailyTab" style="display:none">
   <div class="coming-soon-panel">
     <div class="coming-soon-accent"></div>
     <div class="coming-soon-message">daily management update coming soon</div>
@@ -222,7 +228,7 @@ document.getElementById('clearAllFilters').onclick=()=>{state.visibleFilters=[];
 document.getElementById('datePreset').onchange=e=>applyPreset(e.target.value);document.getElementById('applyRange').onclick=()=>{const a=parseDate(document.getElementById('dateFrom').value),b=parseDate(document.getElementById('dateTo').value);if(a&&b)selectRange(a,b)};
 document.addEventListener('click',e=>{const m=document.getElementById('filterMenu'),p=document.getElementById('filterPickerBtn');if(m.classList.contains('open')&&!m.contains(e.target)&&!p.contains(e.target))m.classList.remove('open');document.querySelectorAll('.multi-filter-menu.open').forEach(menu=>{if(!menu.parentElement.contains(e.target))menu.classList.remove('open')})});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.getElementById('filterMenu').classList.remove('open');document.querySelectorAll('.multi-filter-menu.open').forEach(x=>x.classList.remove('open'));}});
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.getElementById('summaryTab').style.display=t.dataset.tab==='summary'?'block':'none';document.getElementById('rawTab').style.display=t.dataset.tab==='raw'?'block':'none'});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.getElementById('summaryTab').style.display=t.dataset.tab==='summary'?'block':'none';document.getElementById('rawTab').style.display=t.dataset.tab==='raw'?'block':'none';document.getElementById('dailyTab').style.display=t.dataset.tab==='daily'?'block':'none';if(t.dataset.tab==='raw')renderRaw()});
 state.extraFilters={};loadDemo();
 </script>
 </body></html>
