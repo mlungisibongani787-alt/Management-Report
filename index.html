@@ -115,7 +115,7 @@ function findCol(...names){for(const n of names){const i=getCol(n);if(i>=0)retur
 function getVal(o,...names){for(const n of names){const key=state.headers.find(h=>norm(h)===norm(n));if(key!==undefined&&o[key]!==undefined&&o[key]!=='')return o[key]}return ''}
 function metricValue(o,metric){if(metric==='Qty')return num(getVal(o,'Qty','Quantity'));if(metric==='Picked')return num(getVal(o,'Picked','QtyPic'));if(metric==='WIP'){const v=getVal(o,'WIP');return v!==''?num(v):Math.max(0,metricValue(o,'Qty')-metricValue(o,'Picked'));}return 0}
 function typeValue(o){let t=String(getVal(o,'Type')||'').trim();if(!t)t='Unclassified';return t}
-function topType(o){const t=typeValue(o);if(/^LAUNCH$/i.test(t))return 'NON VAS';if(/^NVS[_ ]Priority/i.test(t))return 'NVS';return t}
+function topType(o){const t=typeValue(o);if(/^NVS[_ ]Priority/i.test(t))return 'NVS';return t}
 function statusValue(o){return String(getVal(o,'STATUS','Status')||'').trim()}
 function dateFieldCandidates(){return state.headers.filter(h=>{const n=norm(h);return /DATE|TIME|DELIVERY|POD|LOADED|EDIT/.test(n)})}
 function chooseDateField(){const preferred=['DELIVERYDATE2','Delivery Date','DELIVERY DATE','DateAdded','LOADED DATE','POD DATE'];for(const p of preferred){const h=state.headers.find(x=>norm(x)===norm(p));if(h)return h}const candidates=dateFieldCandidates();return candidates[0]||''}
