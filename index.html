@@ -94,6 +94,7 @@ const state={headers:[],rows:[],sourceName:"",dateField:"",selectedDates:new Set
 const CLOSED_RE=/(complete|completed|closed|shipped|delivered)/i;
 const fmt=n=>Number(n||0).toLocaleString('en-ZA');
 const fmtSigned=n=>{const v=Number(n||0);return v>0?'+'+fmt(v):fmt(v)};
+const fmtBalance=n=>{const v=Number(n||0);return v===0?'0':'-'+fmt(Math.abs(v))};
 const num=v=>{if(v===null||v===undefined||v==='')return 0;if(typeof v==='number')return isFinite(v)?v:0;const s=String(v).replace(/,/g,'').replace(/\s/g,'').replace(/[^0-9.\-]/g,'');const n=Number(s);return isFinite(n)?n:0};
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function parseDate(v){
@@ -221,12 +222,12 @@ function buildOperational(metric){
    const shipped=dates.map(d=>valueForDate(shippedRows,d));
    // Balance is zero once there is nothing left to be shipped; otherwise
    // show the remaining balance as a negative number (or positive if over-shipped).
-   const subtract=dates.map((d,i)=>toShip[i]===0?0:shipped[i]-toShip[i]);
+   const subtract=dates.map((d,i)=>toShip[i]===0?0:(shipped[i]>=toShip[i]?-toShip[i]:shipped[i]-toShip[i]));
    const addRow=(label,vals,signed=false)=>{
      let total=0,idx=0;
      html.value+=`<tr class="calc-row ${label==='Pack Complete'?'calc-pack':label==='To Be Shipped ( GrTL + PkC)'?'calc-ship':label==='Shipped Complete'?'calc-shipped':'calc-subtract'}"><td>${esc(label)}</td>`;
-     months.forEach(m=>{let mt=0;m.dates.forEach(()=>{const v=vals[idx++]||0;mt+=v;total+=v;html.value+=`<td class="num">${signed?fmtSigned(v):fmt(v)}</td>`});html.value+=`<td class="num grey">${signed?fmtSigned(mt):fmt(mt)}</td>`});
-     html.value+=`<td class="num total">${signed?fmtSigned(total):fmt(total)}</td></tr>`;
+     months.forEach(m=>{let mt=0;m.dates.forEach(()=>{const v=vals[idx++]||0;mt+=v;total+=v;html.value+=`<td class="num">${label==='Shipped Complete Balance'?fmtBalance(v):(signed?fmtSigned(v):fmt(v))}</td>`});html.value+=`<td class="num grey">${label==='Shipped Complete Balance'?fmtBalance(mt):(signed?fmtSigned(mt):fmt(mt))}</td>`});
+     html.value+=`<td class="num total">${label==='Shipped Complete Balance'?fmtBalance(total):(signed?fmtSigned(total):fmt(total))}</td></tr>`;
    };
    addRow('Pack Complete',pack);
    addRow('To Be Shipped ( GrTL + PkC)',toShip);
@@ -234,11 +235,11 @@ function buildOperational(metric){
    addRow('Shipped Complete Balance',subtract,true);
  };
  const addCalcRowsMonthly=(html,monthKeys)=>{
-   const addRow=(label,fn,signed=false)=>{let total=0;html.value+=`<tr class="calc-row ${label==='Pack Complete'?'calc-pack':label==='To Be Shipped ( GrTL + PkC)'?'calc-ship':label==='Shipped Complete'?'calc-shipped':'calc-subtract'}"><td>${esc(label)}</td>`;monthKeys.forEach(m=>{const v=fn(m);total+=v;html.value+=`<td class="num">${signed?fmtSigned(v):fmt(v)}</td>`});html.value+=`<td class="num total">${signed?fmtSigned(total):fmt(total)}</td></tr>`};
+   const addRow=(label,fn,signed=false)=>{let total=0;html.value+=`<tr class="calc-row ${label==='Pack Complete'?'calc-pack':label==='To Be Shipped ( GrTL + PkC)'?'calc-ship':label==='Shipped Complete'?'calc-shipped':'calc-subtract'}"><td>${esc(label)}</td>`;monthKeys.forEach(m=>{const v=fn(m);total+=v;html.value+=`<td class="num">${label==='Shipped Complete Balance'?fmtBalance(v):(signed?fmtSigned(v):fmt(v))}</td>`});html.value+=`<td class="num total">${label==='Shipped Complete Balance'?fmtBalance(total):(signed?fmtSigned(total):fmt(total))}</td></tr>`};
    addRow('Pack Complete',m=>valueForMonth(packRows,m));
    addRow('To Be Shipped ( GrTL + PkC)',m=>valueForMonth(rows,m)+valueForMonth(packRows,m));
    addRow('Shipped Complete',m=>valueForMonth(shippedRows,m));
-   addRow('Shipped Complete Balance',m=>{const toShip=valueForMonth(rows,m)+valueForMonth(packRows,m);return toShip===0?0:valueForMonth(shippedRows,m)-toShip},true);
+   addRow('Shipped Complete Balance',m=>{const toShip=valueForMonth(rows,m)+valueForMonth(packRows,m);const shipped=valueForMonth(shippedRows,m);return toShip===0?0:(shipped>=toShip?-toShip:shipped-toShip)},true);
  };
  if(state.dateViewMode==='months'){
    const monthKeys=monthKeysFromRows(rows);
