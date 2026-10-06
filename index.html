@@ -232,14 +232,12 @@ function buildOperational(metric){
    addRow('Pack Complete',pack);
    addRow('To Be Shipped ( GrTL + PkC)',toShip);
    addRow('Shipped Complete',shipped);
-   addRow('Shipped Complete Balance',subtract,true);
  };
  const addCalcRowsMonthly=(html,monthKeys)=>{
    const addRow=(label,fn,signed=false)=>{let total=0;html.value+=`<tr class="calc-row ${label==='Pack Complete'?'calc-pack':label==='To Be Shipped ( GrTL + PkC)'?'calc-ship':label==='Shipped Complete'?'calc-shipped':'calc-subtract'}"><td>${esc(label)}</td>`;monthKeys.forEach(m=>{const v=fn(m);total+=v;html.value+=`<td class="num">${label==='Shipped Complete Balance'?fmtBalance(v):(signed?fmtSigned(v):fmt(v))}</td>`});html.value+=`<td class="num total">${label==='Shipped Complete Balance'?fmtBalance(total):(signed?fmtSigned(total):fmt(total))}</td></tr>`};
    addRow('Pack Complete',m=>valueForMonth(packRows,m));
    addRow('To Be Shipped ( GrTL + PkC)',m=>valueForMonth(rows,m)+valueForMonth(packRows,m));
    addRow('Shipped Complete',m=>valueForMonth(shippedRows,m));
-   addRow('Shipped Complete Balance',m=>{const toShip=valueForMonth(rows,m)+valueForMonth(packRows,m);const shipped=valueForMonth(shippedRows,m);return toShip===0?0:(shipped>=toShip?-toShip:shipped-toShip)},true);
  };
  if(state.dateViewMode==='months'){
    const monthKeys=monthKeysFromRows(rows);
